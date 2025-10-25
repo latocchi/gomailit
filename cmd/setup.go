@@ -5,7 +5,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/latocchi/gomailit/internal/providers"
 	"github.com/spf13/cobra"
@@ -16,7 +15,7 @@ var provider string
 // setupCmd represents the setup command
 var setupCmd = &cobra.Command{
 	Use:   "setup",
-	Short: "A brief description of your command",
+	Short: "Setup email provider. Default is google",
 	Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command. For example:
 
@@ -25,9 +24,15 @@ This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) < 1 {
-			fmt.Println("Please specify an email provider to set up (e.g., google)")
-			os.Exit(1)
+			fmt.Println("Unsupported provider:", provider)
+			fmt.Println("Switching to default provider 'google'")
+			_, err := providers.SetupGoogle()
+			if err != nil {
+				fmt.Println("Error setting up Google provider:", err)
+			}
+			return
 		}
+
 		provider = args[0]
 
 		switch provider {
@@ -36,9 +41,14 @@ to quickly create a Cobra application.`,
 			if err != nil {
 				fmt.Println("Error setting up Google provider:", err)
 			}
+		// TODO: Add other providers here
 		default:
 			fmt.Println("Unsupported provider:", provider)
-			// TODO: Change default so that the program exits with error code
+			fmt.Println("Switching to default provider 'google'")
+			_, err := providers.SetupGoogle()
+			if err != nil {
+				fmt.Println("Error setting up Google provider:", err)
+			}
 		}
 	},
 }
