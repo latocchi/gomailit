@@ -4,16 +4,15 @@ Copyright © 2025 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"fmt"
 	"os"
 
+	"github.com/latocchi/gomailit/internal/providers"
 	"github.com/latocchi/gomailit/internal/utils"
 	"github.com/spf13/cobra"
 )
 
 var (
 	to      string
-	from    string
 	body    string
 	subject string
 )
@@ -37,10 +36,10 @@ to quickly create a Cobra application.`,
 			body = string(data)
 		}
 
-		fmt.Printf("From: %s\n", from)
-		fmt.Printf("To: %s\n", to)
-		fmt.Printf("Subject: %s\n", subject)
-		fmt.Printf("Body: %s\n", body)
+		err := providers.SendEmailGMail(to, subject, body)
+		if err != nil {
+			panic(err)
+		}
 	},
 }
 
@@ -58,15 +57,10 @@ func init() {
 	// sendCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 
 	sendCmd.Flags().StringVarP(&to, "to", "t", "", "Recipient of the email")
-	sendCmd.Flags().StringVarP(&from, "from", "f", "", "Sender of the email")
 	sendCmd.Flags().StringVarP(&body, "body", "b", "No body", "Body of the email, can be '-' for stdin or a .txt file path")
 	sendCmd.Flags().StringVarP(&subject, "subject", "s", "No subject", "Subject of the email")
 
 	if err := sendCmd.MarkFlagRequired("to"); err != nil {
-		panic(err)
-	}
-
-	if err := sendCmd.MarkFlagRequired("from"); err != nil {
 		panic(err)
 	}
 }

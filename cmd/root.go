@@ -10,8 +10,7 @@ import (
 )
 
 // TODO: Setup email credentials
-// TODO: Save credentials in keyring
-// TODO: Get credentials in keyring
+// TODO: Send email using gmail first before adding other providers
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{

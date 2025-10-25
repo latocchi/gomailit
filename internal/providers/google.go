@@ -3,6 +3,7 @@ package providers
 import (
 	"bufio"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -18,18 +19,43 @@ import (
 	"google.golang.org/api/option"
 )
 
-func SetupGoogle() (*gmail.Service, error) {
-	b, err := os.ReadFile("credentials.json")
+func SendEmailGMail(to, subject, body string) error {
+	srv, err := getGoogleService()
 	if err != nil {
-		return nil, fmt.Errorf("unable to read client secret file: %v", err)
+		return fmt.Errorf("unable to get google mail service: %v", err)
 	}
-
-	config, err := google.ConfigFromJSON(b, gmail.GmailSendScope)
+	profile, err := srv.Users.GetProfile("me").Do()
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse client secret file to config: %v", err)
+		return fmt.Errorf("unable to get user profile: %v", err)
 	}
+	fmt.Printf("Sending email as %s\n", profile.EmailAddress)
 
-	client := getClient(config)
+	message := []byte(
+		fmt.Sprintf("To: %s\r\n", to) +
+			fmt.Sprintf("Subject: %s\r\n", subject) +
+			"MIME-Version: 1.0\r\n" +
+			"Content-Type: text/plain; charset=\"utf-8\"\r\n\r\n" +
+			body,
+	)
+
+	var mail gmail.Message
+	mail.Raw = base64.RawURLEncoding.EncodeToString(message)
+
+	user := "me"
+	_, err = srv.Users.Messages.Send(user, &mail).Do()
+	if err != nil {
+		return fmt.Errorf("unable to send email: %v", err)
+	}
+	fmt.Println("Email sent successfully!")
+
+	return nil
+}
+
+func getGoogleService() (*gmail.Service, error) {
+	client, err := SetupGoogle()
+	if err != nil {
+		return nil, fmt.Errorf("unable to setup google client: %v", err)
+	}
 
 	srv, err := gmail.NewService(context.Background(), option.WithHTTPClient(client))
 	if err != nil {
@@ -37,6 +63,22 @@ func SetupGoogle() (*gmail.Service, error) {
 	}
 
 	return srv, nil
+}
+
+func SetupGoogle() (*http.Client, error) {
+	b, err := os.ReadFile("credentials.json")
+	if err != nil {
+		return nil, fmt.Errorf("unable to read client secret file: %v", err)
+	}
+
+	config, err := google.ConfigFromJSON(b, gmail.GmailSendScope, gmail.GmailMetadataScope)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse client secret file to config: %v", err)
+	}
+
+	client := getClient(config)
+
+	return client, nil
 }
 
 // Retrieve a token, saves the token, then returns the generated client.
