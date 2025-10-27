@@ -1,5 +1,5 @@
 /*
-Copyright © 2025 NAME HERE <EMAIL ADDRESS>
+Copyright © 2025 Jaycy Ivan Bañaga jaycybanaga@gmail.com
 */
 package cmd
 
