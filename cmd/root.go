@@ -9,8 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// TODO: Setup email credentials
-// TODO: Send email using gmail first before adding other providers
+// TODO: Send email with attachments
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{

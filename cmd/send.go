@@ -13,9 +13,10 @@ import (
 )
 
 var (
-	to      string
-	body    string
-	subject string
+	to          string
+	body        string
+	subject     string
+	attachments []string
 )
 
 // sendCmd represents the send command
@@ -34,7 +35,30 @@ to quickly create a Cobra application.`,
 			os.Exit(1)
 		}
 
-		if utils.IsFile(body) {
+		if cmd.Flags().Changed("attach") {
+			attachments = args
+		}
+
+		// fmt.Println(attachments)
+		if len(attachments) > 0 {
+			// Requirements:
+			// --attach file1 file2
+			// --attach ~/directory/subfolder/*
+
+			// Go through attachments and remove any that do not exist
+			for index, path := range attachments {
+				// if file does not exist, remove from attachments slice
+				fmt.Println("Checking attachment:", path)
+				if !utils.FileExists(path) {
+					fmt.Printf("Attachment file not found: %s\n", path)
+					attachments = append(attachments[:index], attachments[index+1:]...)
+					break
+				}
+
+			}
+		}
+
+		if utils.FileExists(body) {
 			data, err := os.ReadFile(body)
 			if err != nil {
 				panic(err)
@@ -42,10 +66,11 @@ to quickly create a Cobra application.`,
 			body = string(data)
 		}
 
-		err := providers.SendEmailGMail(to, subject, body)
+		err := providers.SendEmailGMail(to, subject, body, attachments)
 		if err != nil {
 			panic(err)
 		}
+
 	},
 }
 
@@ -65,8 +90,9 @@ func init() {
 	sendCmd.Flags().StringVarP(&to, "to", "t", "", "Recipient of the email")
 	sendCmd.Flags().StringVarP(&body, "body", "b", "No body", "Body of the email, can be '-' for stdin or a .txt file path")
 	sendCmd.Flags().StringVarP(&subject, "subject", "s", "No subject", "Subject of the email")
-
+	sendCmd.Flags().BoolP("attach", "a", false, "File paths to attach to the email")
 	if err := sendCmd.MarkFlagRequired("to"); err != nil {
 		panic(err)
 	}
+
 }

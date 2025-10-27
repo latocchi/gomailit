@@ -2,15 +2,21 @@ package providers
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
+	"mime/multipart"
+	"mime/quotedprintable"
 	"net"
 	"net/http"
+	"net/textproto"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"sync"
 
 	"github.com/latocchi/gomailit/internal/utils"
 	"golang.org/x/oauth2"
@@ -19,17 +25,88 @@ import (
 	"google.golang.org/api/option"
 )
 
-func SendEmailGMail(to, subject, body string) error {
-	srv, err := getGoogleService()
-	if err != nil {
-		return fmt.Errorf("unable to get google mail service: %v", err)
-	}
-	profile, err := srv.Users.GetProfile("me").Do()
-	if err != nil {
-		return fmt.Errorf("unable to get user profile: %v", err)
-	}
-	fmt.Printf("Sending email as %s\n", profile.EmailAddress)
+type AttachmentPart struct {
+	Header textproto.MIMEHeader
+	Body   []byte
+	Err    error
+}
 
+func buildMessageWithAttachments(to, subject, body string, attachments []string) *gmail.Message {
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+	boundary := writer.Boundary()
+
+	headers := fmt.Sprintf(
+		"To: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=%s\r\n\r\n",
+		to, subject, boundary,
+	)
+	buf.WriteString(headers)
+
+	bodyHeader := textproto.MIMEHeader{}
+	bodyHeader.Set("Content-Type", "text/plain; charset=\"UTF-8\"")
+	bodyHeader.Set("Content-Transfer-Encoding", "quoted-printable")
+
+	bodyPart, _ := writer.CreatePart(bodyHeader)
+	qp := quotedprintable.NewWriter(bodyPart)
+	qp.Write([]byte(body))
+	qp.Close()
+
+	var wg sync.WaitGroup
+	results := make(chan AttachmentPart, len(attachments))
+
+	for _, path := range attachments {
+		wg.Add(1)
+		go func(p string) {
+			defer wg.Done()
+			data, err := os.ReadFile(path)
+			if err != nil {
+				results <- AttachmentPart{Err: err}
+				return
+			}
+
+			encoded := make([]byte, base64.StdEncoding.EncodedLen(len(data)))
+			base64.StdEncoding.Encode(encoded, data)
+
+			filename := filepath.Base(path)
+
+			attachmentHeader := textproto.MIMEHeader{}
+			attachmentHeader.Set("Content-Type", fmt.Sprintf("application/octet-stream; name=\"%s\"", filename))
+			attachmentHeader.Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
+			attachmentHeader.Set("Content-Transfer-Encoding", "base64")
+
+			results <- AttachmentPart{Header: attachmentHeader, Body: encoded, Err: nil}
+		}(path)
+	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	for part := range results {
+		if part.Err != nil {
+			panic(part.Err)
+		}
+
+		w, _ := writer.CreatePart(part.Header)
+
+		for i := 0; i < len(part.Body); i += 76 {
+			end := i + 76
+			if end > len(part.Body) {
+				end = len(part.Body)
+			}
+			w.Write(part.Body[i:end])
+			w.Write([]byte("\r\n"))
+		}
+	}
+
+	writer.Close()
+	raw := utils.EncodeURLSafeBase64(buf.Bytes())
+	return &gmail.Message{Raw: raw}
+
+}
+
+func buildMessage(to, subject, body string) *gmail.Message {
 	message := []byte(
 		fmt.Sprintf("To: %s\r\n", to) +
 			fmt.Sprintf("Subject: %s\r\n", subject) +
@@ -37,17 +114,49 @@ func SendEmailGMail(to, subject, body string) error {
 			"Content-Type: text/plain; charset=\"utf-8\"\r\n\r\n" +
 			body,
 	)
+	raw := utils.EncodeURLSafeBase64(message)
+	return &gmail.Message{Raw: raw}
+}
 
-	var mail gmail.Message
-	mail.Raw = base64.RawURLEncoding.EncodeToString(message)
+func SendEmailGMail(to, subject, body string, attachments []string) error {
+	srv, err := getGoogleService()
+	if err != nil {
+		return fmt.Errorf("unable to get google mail service: %v", err)
+	}
 
-	user := "me"
-	_, err = srv.Users.Messages.Send(user, &mail).Do()
+	profile, err := srv.Users.GetProfile("me").Do()
+	if err != nil {
+		return fmt.Errorf("unable to get user profile: %v", err)
+	}
+
+	fmt.Printf("Sending email as %s\n", profile.EmailAddress)
+
+	if len(attachments) > 0 {
+		mail := buildMessageWithAttachments(to, subject, body, attachments)
+		err = send(srv, mail)
+		if err != nil {
+			return err
+		}
+		fmt.Println("Email with attachments sent successfully to " + to + "!")
+		return nil
+	}
+
+	mail := buildMessage(to, subject, body)
+
+	err = send(srv, mail)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Email sent successfully to " + to + "!")
+	return nil
+}
+
+func send(srv *gmail.Service, mail *gmail.Message) error {
+	_, err := srv.Users.Messages.Send("me", mail).Do()
 	if err != nil {
 		return fmt.Errorf("unable to send email: %v", err)
 	}
-	fmt.Println("Email sent successfully!")
-
 	return nil
 }
 
