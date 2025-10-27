@@ -2,3 +2,6 @@ credentials.json
 token.json
 Go-Mail-It
 gomailit
+gomailit-windows-amd64.exe
+gomailit-darwin-arm64
+gomailit-linux-amd64
