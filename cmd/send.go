@@ -4,8 +4,12 @@ Copyright © 2025 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"bufio"
 	"fmt"
+	"log"
 	"os"
+	"strings"
+	"sync"
 
 	"github.com/latocchi/gomailit/internal/providers"
 	"github.com/latocchi/gomailit/internal/utils"
@@ -17,6 +21,7 @@ var (
 	body        string
 	subject     string
 	attachments []string
+	recipients  []string
 )
 
 // sendCmd represents the send command
@@ -35,16 +40,24 @@ to quickly create a Cobra application.`,
 			os.Exit(1)
 		}
 
+		srv, err := providers.GetGoogleService()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Unable to get google mail service: %v", err)
+		}
+
+		profile, err := srv.Users.GetProfile("me").Do()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Unable to get user profile: %v", err)
+		}
+
+		fmt.Printf("Sending email as %s\n", profile.EmailAddress)
+
 		if cmd.Flags().Changed("attach") {
 			attachments = args
 		}
 
 		// fmt.Println(attachments)
 		if len(attachments) > 0 {
-			// Requirements:
-			// --attach file1 file2
-			// --attach ~/directory/subfolder/*
-
 			// Go through attachments and remove any that do not exist
 			for index, path := range attachments {
 				// if file does not exist, remove from attachments slice
@@ -66,9 +79,54 @@ to quickly create a Cobra application.`,
 			body = string(data)
 		}
 
-		err := providers.SendEmailGMail(to, subject, body, attachments)
-		if err != nil {
-			panic(err)
+		// Check if 'to' is a file with multiple recipients
+		if utils.FileExists(to) {
+			file, err := os.Open(to)
+			if err != nil {
+				panic(err)
+			}
+
+			defer file.Close()
+
+			scanner := bufio.NewScanner(file)
+			for scanner.Scan() {
+				line := strings.TrimSpace(scanner.Text())
+				if line != "" {
+					recipients = append(recipients, line)
+				}
+			}
+
+			if err := scanner.Err(); err != nil {
+				log.Fatalf("failed to read file: %v", err)
+			}
+
+			sem := make(chan struct{}, 5) // limit to 5 concurrent goroutines
+			var wg sync.WaitGroup
+
+			for _, recipient := range recipients {
+				// Should i use goroutines here?
+				wg.Add(1)
+				sem <- struct{}{}
+
+				go func(recipient string) {
+					defer wg.Done()
+					defer func() { <-sem }()
+
+					if err := providers.SendEmailGMail(recipient, subject, body, attachments); err != nil {
+						fmt.Printf("Failed to send email to %s: %v\n", recipient, err)
+					} else {
+						fmt.Printf("Email sent to %s successfully.\n", recipient)
+					}
+				}(recipient)
+			}
+			wg.Wait()
+			fmt.Println("All emails sent.")
+		} else { // Single recipient
+			if err := providers.SendEmailGMail(to, subject, body, attachments); err != nil {
+				fmt.Printf("Failed to send email to %s: %v\n", to, err)
+			} else {
+				fmt.Printf("Email sent to %s successfully.\n", to)
+			}
 		}
 
 	},

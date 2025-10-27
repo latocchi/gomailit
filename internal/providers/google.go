@@ -119,17 +119,10 @@ func buildMessage(to, subject, body string) *gmail.Message {
 }
 
 func SendEmailGMail(to, subject, body string, attachments []string) error {
-	srv, err := getGoogleService()
+	srv, err := GetGoogleService()
 	if err != nil {
 		return fmt.Errorf("unable to get google mail service: %v", err)
 	}
-
-	profile, err := srv.Users.GetProfile("me").Do()
-	if err != nil {
-		return fmt.Errorf("unable to get user profile: %v", err)
-	}
-
-	fmt.Printf("Sending email as %s\n", profile.EmailAddress)
 
 	if len(attachments) > 0 {
 		mail := buildMessageWithAttachments(to, subject, body, attachments)
@@ -137,7 +130,7 @@ func SendEmailGMail(to, subject, body string, attachments []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println("Email with attachments sent successfully to " + to + "!")
+		// fmt.Println("Email with attachments sent successfully to " + to + "!")
 		return nil
 	}
 
@@ -147,8 +140,6 @@ func SendEmailGMail(to, subject, body string, attachments []string) error {
 	if err != nil {
 		return err
 	}
-
-	fmt.Println("Email sent successfully to " + to + "!")
 	return nil
 }
 
@@ -160,7 +151,7 @@ func send(srv *gmail.Service, mail *gmail.Message) error {
 	return nil
 }
 
-func getGoogleService() (*gmail.Service, error) {
+func GetGoogleService() (*gmail.Service, error) {
 	client, err := SetupGoogle()
 	if err != nil {
 		return nil, fmt.Errorf("unable to setup google client: %v", err)
