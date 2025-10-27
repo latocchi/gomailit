@@ -4,8 +4,11 @@ Copyright © 2025 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"bufio"
 	"fmt"
+	"log"
 	"os"
+	"strings"
 
 	"github.com/latocchi/gomailit/internal/providers"
 	"github.com/latocchi/gomailit/internal/utils"
@@ -17,6 +20,7 @@ var (
 	body        string
 	subject     string
 	attachments []string
+	recipients  []string
 )
 
 // sendCmd represents the send command
@@ -66,9 +70,39 @@ to quickly create a Cobra application.`,
 			body = string(data)
 		}
 
-		err := providers.SendEmailGMail(to, subject, body, attachments)
-		if err != nil {
-			panic(err)
+		// Check if 'to' is a file with multiple recipients
+		if utils.FileExists(to) {
+			file, err := os.Open(to)
+			if err != nil {
+				panic(err)
+			}
+
+			defer file.Close()
+
+			scanner := bufio.NewScanner(file)
+			for scanner.Scan() {
+				line := strings.TrimSpace(scanner.Text())
+				if line != "" {
+					recipients = append(recipients, line)
+				}
+			}
+
+			if err := scanner.Err(); err != nil {
+				log.Fatalf("failed to read file: %v", err)
+			}
+
+			for _, recipient := range recipients {
+				// Should i use goroutines here?
+				err := providers.SendEmailGMail(recipient, subject, body, attachments)
+				if err != nil {
+					panic(err)
+				}
+			}
+		} else { // Single recipient
+			err := providers.SendEmailGMail(to, subject, body, attachments)
+			if err != nil {
+				panic(err)
+			}
 		}
 
 	},
