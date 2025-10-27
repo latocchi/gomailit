@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/latocchi/gomailit/internal/providers"
 	"github.com/latocchi/gomailit/internal/utils"
@@ -39,16 +40,24 @@ to quickly create a Cobra application.`,
 			os.Exit(1)
 		}
 
+		srv, err := providers.GetGoogleService()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Unable to get google mail service: %v", err)
+		}
+
+		profile, err := srv.Users.GetProfile("me").Do()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Unable to get user profile: %v", err)
+		}
+
+		fmt.Printf("Sending email as %s\n", profile.EmailAddress)
+
 		if cmd.Flags().Changed("attach") {
 			attachments = args
 		}
 
 		// fmt.Println(attachments)
 		if len(attachments) > 0 {
-			// Requirements:
-			// --attach file1 file2
-			// --attach ~/directory/subfolder/*
-
 			// Go through attachments and remove any that do not exist
 			for index, path := range attachments {
 				// if file does not exist, remove from attachments slice
@@ -91,17 +100,32 @@ to quickly create a Cobra application.`,
 				log.Fatalf("failed to read file: %v", err)
 			}
 
+			sem := make(chan struct{}, 5) // limit to 5 concurrent goroutines
+			var wg sync.WaitGroup
+
 			for _, recipient := range recipients {
 				// Should i use goroutines here?
-				err := providers.SendEmailGMail(recipient, subject, body, attachments)
-				if err != nil {
-					panic(err)
-				}
+				wg.Add(1)
+				sem <- struct{}{}
+
+				go func(recipient string) {
+					defer wg.Done()
+					defer func() { <-sem }()
+
+					if err := providers.SendEmailGMail(recipient, subject, body, attachments); err != nil {
+						fmt.Printf("Failed to send email to %s: %v\n", recipient, err)
+					} else {
+						fmt.Printf("Email sent to %s successfully.\n", recipient)
+					}
+				}(recipient)
 			}
+			wg.Wait()
+			fmt.Println("All emails sent.")
 		} else { // Single recipient
-			err := providers.SendEmailGMail(to, subject, body, attachments)
-			if err != nil {
-				panic(err)
+			if err := providers.SendEmailGMail(to, subject, body, attachments); err != nil {
+				fmt.Printf("Failed to send email to %s: %v\n", to, err)
+			} else {
+				fmt.Printf("Email sent to %s successfully.\n", to)
 			}
 		}
 
