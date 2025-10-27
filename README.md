@@ -20,14 +20,14 @@ mv gomailit /usr/local/bin/
 ``` -->
 
 ```bash
-go install github.com/youruser/gomailit/cmd/gomailit@latest
+go install github.com/latocchi/gomailit/cmd/gomailit@latest
 ```
 
 ## Usage
 ### Basic setup
 Authenticate your Gmail account to enable email sending:
 ```bash
-gomail setup google
+gomailit setup google
 ```
 This will:
    - Open a browser window for Google OAuth2 authentication.
