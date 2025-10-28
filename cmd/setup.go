@@ -16,12 +16,20 @@ var provider string
 var setupCmd = &cobra.Command{
 	Use:   "setup",
 	Short: "Setup email provider. Default is google",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Long: `
+Usage:
+gomailit setup [provider]
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+Examples:
+
+Setup Google provider
+gomailit setup google
+
+Supported Providers:
+- google / gmail
+
+As of now only Google provider is supported.
+	`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) < 1 {
 			fmt.Println("Unsupported provider:", provider)

@@ -28,12 +28,42 @@ var (
 var sendCmd = &cobra.Command{
 	Use:   "send",
 	Short: "Sends email using the configured provider",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Long: `Usage:
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+Basic Send
+gomailit send --from alice@example.com --to bob@example.com \
+	--subject "Hello" --body "This is a test"
+
+Examples:
+
+Send with attachment
+gomailit send --to bob@example.com --subject "Files" --body "See attached" \
+	--attach report.pdf
+
+Send multiple attachments
+gomailit send --to bob@example.com --subject "Files" --body "See attached" \ 
+	--attach report.pdf agenda.pdf
+
+Attach all files from a directory
+gomailit send --to bob@example.com --subject "Files" --body "See attached" \ 
+	--attach ~/Documents/report/*
+
+Use file for email body
+gomailit send --to bob@example.com --subject "Files" --body ~/Documents/body.txt \
+	--attach ~/Documents/report/*
+
+Send to multiple recipients via .txt file
+gomailit send --to ~/Documents/recipients.txt --subject "Files" \ 
+	--body ~/Documents/body.txt --attach ~/Documents/report/*
+
+Example contents of recipients.txt file:
+recipient@example.com
+recipient1@example.com
+recipient2@example.com
+recipient3@example.com
+recipient4@example.com
+recipient5@example.com
+`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if !utils.IsFile(utils.TokenPath()) {
 			fmt.Println("No token found, please run 'gomailit setup google' first to set up the Google provider.")
@@ -143,12 +173,12 @@ func init() {
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	// sendCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	// sendCmd.Flags().BoolP("toggle", "p", false, "Help message for toggle")
 
-	sendCmd.Flags().StringVarP(&to, "to", "t", "", "Recipient of the email")
-	sendCmd.Flags().StringVarP(&body, "body", "b", "No body", "Body of the email, can be '-' for stdin or a .txt file path")
-	sendCmd.Flags().StringVarP(&subject, "subject", "s", "No subject", "Subject of the email")
-	sendCmd.Flags().BoolP("attach", "a", false, "File paths to attach to the email")
+	sendCmd.Flags().StringVarP(&to, "to", "t", "", "Recipient (single email or .txt file with one address per line)")
+	sendCmd.Flags().StringVarP(&body, "body", "b", "No body", "Body of the email, can be '-' for stdin or a .txt file path (default \"No body\")")
+	sendCmd.Flags().StringVarP(&subject, "subject", "s", "No subject", "Subject of the email (default \"No subject\")")
+	sendCmd.Flags().BoolP("attach", "a", false, "One or more attachment files, or a directory path")
 	if err := sendCmd.MarkFlagRequired("to"); err != nil {
 		panic(err)
 	}

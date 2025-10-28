@@ -20,7 +20,7 @@ mv gomailit /usr/local/bin/
 ``` -->
 
 ```bash
-go install github.com/latocchi/gomailit/cmd/gomailit@latest
+go install github.com/latocchi/gomailit@latest
 ```
 
 ## Usage
