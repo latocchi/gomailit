@@ -86,11 +86,6 @@ recipient4@example.com
 recipient5@example.com
 ```
 
-## Contributing
-
-- Fork the repo and open a feature branch
-- Open a pull request with clear description
-
 ## License
 
 MIT — see LICENSE file for details.
